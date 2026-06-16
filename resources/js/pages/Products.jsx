@@ -99,7 +99,26 @@ const Products = () => {
     };
 
     const columns = [
-        { header: 'No', render: (_, idx) => <span className="text-gray-500">{(meta?.current_page - 1) * 10 + idx + 1}</span> },
+        { header: 'Gambar', render: (row) => (
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center border border-gray-200">
+                {row.image ? (
+                    <img
+                        src={`/${row.image}`}
+                        alt={row.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = `<svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>`;
+                        }}
+                    />
+                ) : (
+                    <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                )}
+            </div>
+        )},
         { header: 'Kode', render: (row) => (
             <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
                 {row.code} {row.code && row.code !== row.name && <span className="text-green-500 ml-1" title="Barcode/QR tersimpan">#</span>}

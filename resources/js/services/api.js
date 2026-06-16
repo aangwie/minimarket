@@ -101,7 +101,10 @@ export const saleAPI = {
 
 export const settingAPI = {
     index: () => api.get('/settings'),
-    update: (data) => api.put('/settings', data),
+    update: (data) => api.post('/settings', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { _method: 'PUT' },
+    }),
 };
 
 export const stockAPI = {

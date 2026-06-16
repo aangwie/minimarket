@@ -3,6 +3,7 @@ import { productAPI, customerAPI, saleAPI } from '../services/api';
 import Swal from 'sweetalert2';
 import { formatCurrency, formatNumber } from '../utils/format';
 import BarcodeScanner from '../components/BarcodeScanner';
+import ProductImage from '../components/ProductImage';
 
 const POS = () => {
     const [cart, setCart] = useState([]);
@@ -275,10 +276,8 @@ const POS = () => {
                                         : 'border-gray-200 hover:border-orange-300 hover:shadow-md bg-white'
                                 }`}
                             >
-                                <div className="w-full h-20 bg-gradient-to-br from-orange-100 to-orange-50 rounded-lg mb-2 flex items-center justify-center">
-                                    <svg className={`w-8 h-8 ${product.stock <= 0 ? 'text-gray-400' : 'text-orange-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                    </svg>
+                                <div className={`w-full h-20 rounded-lg mb-2 flex items-center justify-center overflow-hidden ${product.image ? '' : 'bg-gradient-to-br from-orange-100 to-orange-50'}`}>
+                                    <ProductImage src={product.image} alt={product.name} stock={product.stock} />
                                 </div>
                                 <p className="text-xs font-medium text-gray-900 truncate">{product.name}</p>
                                 <p className="text-xs font-bold text-orange-600 mt-1">{formatCurrency(product.price)}</p>

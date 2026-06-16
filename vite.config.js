@@ -18,4 +18,21 @@ export default defineConfig({
             host: 'localhost',
         },
     },
+    build: {
+        chunkSizeWarningLimit: 600,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    vendor: [
+                        'react',
+                        'react-dom',
+                        'react-router-dom',
+                    ],
+                    charts: ['recharts'],
+                    ui: ['sweetalert2'],
+                    qrcode: ['html5-qrcode'],
+                },
+            },
+        },
+    },
 });

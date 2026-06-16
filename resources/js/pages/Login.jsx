@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
+import { settingAPI } from '../services/api';
 
 const Login = () => {
     const { login } = useAuth();
@@ -9,6 +10,27 @@ const Login = () => {
     const [email, setEmail] = useState('admin@minimarket.test');
     const [password, setPassword] = useState('password');
     const [loading, setLoading] = useState(false);
+    const [storeLogo, setStoreLogo] = useState(null);
+    const [storeName, setStoreName] = useState('');
+
+    useEffect(() => {
+        fetchSettings();
+    }, []);
+
+    const fetchSettings = async () => {
+        try {
+            const res = await settingAPI.index();
+            const data = res.data;
+            if (data.store_logo) {
+                setStoreLogo(`data:image/webp;base64,${data.store_logo}`);
+            }
+            if (data.store_name) {
+                setStoreName(data.store_name);
+            }
+        } catch (e) {
+            console.error('Failed to fetch settings:', e);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -33,10 +55,18 @@ const Login = () => {
             <div className="w-full max-w-md">
                 <div className="bg-white rounded-2xl shadow-xl p-8">
                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <span className="text-white font-bold text-2xl">M</span>
-                        </div>
-                        <h1 className="text-2xl font-bold text-gray-900">Minimarket Sekolah</h1>
+                        {storeLogo ? (
+                            <img
+                                src={storeLogo}
+                                alt="Logo"
+                                className="h-16 mx-auto mb-4 object-contain"
+                            />
+                        ) : (
+                            <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <span className="text-white font-bold text-2xl">M</span>
+                            </div>
+                        )}
+                        <h1 className="text-2xl font-bold text-gray-900">{storeName || 'Minimarket Sekolah'}</h1>
                         <p className="text-gray-500 mt-1">Silakan login untuk melanjutkan</p>
                     </div>
 

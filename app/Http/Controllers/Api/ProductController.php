@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -49,6 +50,79 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
+    private function uploadAndConvertToWebp(Request $request, string $fieldName = 'image'): ?string
+    {
+        if (!$request->hasFile($fieldName)) {
+            return null;
+        }
+
+        $image = $request->file($fieldName);
+
+        if (!$image->isValid()) {
+            Log::error('Product image upload: file is not valid');
+            return null;
+        }
+
+        try {
+            // Get image content and create GD resource
+            $imageContent = file_get_contents($image->getRealPath());
+            if (!$imageContent) {
+                Log::error('Product image upload: cannot read file contents');
+                return null;
+            }
+
+            $sourceImage = imagecreatefromstring($imageContent);
+            if (!$sourceImage) {
+                Log::error('Product image upload: GD cannot create image from string');
+                return null;
+            }
+
+            // Resize if larger than 512px (for optimal display)
+            $origWidth = imagesx($sourceImage);
+            $origHeight = imagesy($sourceImage);
+            $maxSize = 512;
+
+            if ($origWidth > $maxSize || $origHeight > $maxSize) {
+                $ratio = min($maxSize / $origWidth, $maxSize / $origHeight);
+                $newWidth = (int) round($origWidth * $ratio);
+                $newHeight = (int) round($origHeight * $ratio);
+
+                $resizedImage = imagecreatetruecolor($newWidth, $newHeight);
+                imagealphablending($resizedImage, false);
+                imagesavealpha($resizedImage, true);
+                imagecopyresampled($resizedImage, $sourceImage, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+
+                imagedestroy($sourceImage);
+                $sourceImage = $resizedImage;
+            }
+
+            // Convert to WebP and capture output
+            ob_start();
+            $webpResult = imagewebp($sourceImage, null, 80);
+            $webpData = ob_get_clean();
+            imagedestroy($sourceImage);
+
+            if (!$webpResult || !$webpData) {
+                Log::error('Product image upload: WebP conversion failed');
+                return null;
+            }
+
+            // Save WebP data directly to storage
+            $filename = time() . '_' . Str::random(8) . '.webp';
+            $saved = Storage::put('public/products/' . $filename, $webpData);
+
+            if (!$saved) {
+                Log::error('Product image upload: Storage::put failed for public/products/' . $filename);
+                return null;
+            }
+
+            return 'storage/products/' . $filename;
+        } catch (\Exception $e) {
+            Log::error('Product image upload exception: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function store(Request $request): JsonResponse
     {
         $request->validate([
@@ -60,16 +134,14 @@ class ProductController extends Controller
             'min_stock' => 'required|integer|min:0',
             'unit' => 'required|string|max:50',
             'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
 
         $data = $request->except('image');
 
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $filename = time() . '_' . $image->getClientOriginalName();
-            $image->storeAs('public/products', $filename);
-            $data['image'] = 'storage/products/' . $filename;
+        $imagePath = $this->uploadAndConvertToWebp($request);
+        if ($imagePath) {
+            $data['image'] = $imagePath;
         }
 
         $product = Product::create($data);
@@ -101,7 +173,7 @@ class ProductController extends Controller
             'min_stock' => 'required|integer|min:0',
             'unit' => 'required|string|max:50',
             'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'boolean',
         ]);
 
@@ -113,10 +185,10 @@ class ProductController extends Controller
                 Storage::delete(str_replace('storage/', 'public/', $product->image));
             }
 
-            $image = $request->file('image');
-            $filename = time() . '_' . $image->getClientOriginalName();
-            $image->storeAs('public/products', $filename);
-            $data['image'] = 'storage/products/' . $filename;
+            $imagePath = $this->uploadAndConvertToWebp($request);
+            if ($imagePath) {
+                $data['image'] = $imagePath;
+            }
         }
 
         $product->update($data);

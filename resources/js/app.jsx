@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import MainLayout from './layouts/MainLayout';
+import Favicon from './components/Favicon';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Categories from './pages/Categories';
@@ -44,6 +45,7 @@ function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
+                <Favicon />
                 <Routes>
                     <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
