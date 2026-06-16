@@ -15,6 +15,55 @@
 
 ---
 
+## 📸 Tangkapan Layar
+
+<p align="center">
+  <img src="raw/dashboard.png" width="800" alt="Halaman Dashboard"><br>
+  <em>Dashboard — Ringkasan bisnis dengan statistik dan grafik</em>
+</p>
+
+<p align="center">
+  <img src="raw/kasir.png" width="800" alt="Halaman POS / Kasir"><br>
+  <em>Point of Sale (POS) — Sistem kasir dengan keranjang belanja</em>
+</p>
+
+<p align="center">
+  <img src="raw/produk.png" width="800" alt="Halaman Manajemen Produk"><br>
+  <em>Manajemen Produk — CRUD produk dengan pencarian dan pagination</em>
+</p>
+
+<p align="center">
+  <img src="raw/kategori.png" width="800" alt="Halaman Kategori"><br>
+  <em>Manajemen Kategori — Mengelompokkan produk</em>
+</p>
+
+<p align="center">
+  <img src="raw/penjualan%20dan%20struk.png" width="800" alt="Halaman Penjualan dan Struk"><br>
+  <em>Riwayat Penjualan & Cetak Struk — Daftar transaksi dan struk pembayaran</em>
+</p>
+
+<p align="center">
+  <img src="raw/stock.png" width="800" alt="Halaman Manajemen Stok"><br>
+  <em>Manajemen Stok & Mutasi Stok — Stok masuk, keluar, dan riwayat pergerakan</em>
+</p>
+
+<p align="center">
+  <img src="raw/laporan.png" width="800" alt="Halaman Laporan Penjualan"><br>
+  <em>Laporan Penjualan — Filter tanggal, ringkasan, dan cetak PDF</em>
+</p>
+
+<p align="center">
+  <img src="raw/login.png" width="400" alt="Halaman Login"><br>
+  <em>Halaman Login — Autentikasi pengguna</em>
+</p>
+
+<p align="center">
+  <img src="raw/pengaturan.png" width="800" alt="Halaman Pengaturan Toko"><br>
+  <em>Pengaturan Toko — Konfigurasi informasi toko dengan pratinjau struk</em>
+</p>
+
+---
+
 ## 📋 Daftar Isi
 
 - [Fitur-Fitur](#fitur-fitur)
@@ -35,7 +84,6 @@
 - [Panduan Instalasi](#panduan-instalasi)
 - [Struktur Database](#struktur-database)
 - [Akun Demo](#akun-demo)
-- [Lisensi](#lisensi)
 
 ---
 
