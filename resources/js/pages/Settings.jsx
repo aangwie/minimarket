@@ -11,6 +11,7 @@ const Settings = () => {
         // QRIS
         qris_type: 'upload',
         qris_dana_url: '',
+        qris_interactive_url: '',
         qris_image: null,
     });
     const [logoPreview, setLogoPreview] = useState(null);
@@ -37,6 +38,7 @@ const Settings = () => {
                 store_logo: null,
                 qris_type: data.qris_type || 'upload',
                 qris_dana_url: data.qris_dana_url || '',
+                qris_interactive_url: data.qris_interactive_url || '',
                 qris_image: null,
             }));
             if (data.store_logo) {
@@ -144,6 +146,7 @@ const Settings = () => {
             // QRIS
             formData.append('qris_type', form.qris_type);
             formData.append('qris_dana_url', form.qris_dana_url);
+            formData.append('qris_interactive_url', form.qris_interactive_url);
             if (form.qris_image) {
                 formData.append('qris_image', form.qris_image);
             }
@@ -165,6 +168,7 @@ const Settings = () => {
                 store_logo: null,
                 qris_type: settings.qris_type || 'upload',
                 qris_dana_url: settings.qris_dana_url || '',
+                qris_interactive_url: settings.qris_interactive_url || '',
                 qris_image: null,
             }));
             if (settings.store_logo) {
@@ -301,7 +305,7 @@ const Settings = () => {
                             {/* QRIS Type */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Tipe QRIS</label>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-3 gap-3">
                                     <label className={`relative flex items-center justify-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
                                         form.qris_type === 'upload'
                                             ? 'border-orange-500 bg-orange-50 ring-1 ring-orange-200'
@@ -348,6 +352,29 @@ const Settings = () => {
                                             <p className="text-xs text-gray-500 mt-0.5">Generate QR dinamis DANA</p>
                                         </div>
                                     </label>
+                                    <label className={`relative flex items-center justify-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                                        form.qris_type === 'interactive'
+                                            ? 'border-orange-500 bg-orange-50 ring-1 ring-orange-200'
+                                            : 'border-gray-200 bg-white hover:border-gray-300'
+                                    }`}>
+                                        <input
+                                            type="radio"
+                                            name="qris_type"
+                                            value="interactive"
+                                            checked={form.qris_type === 'interactive'}
+                                            onChange={() => setForm({ ...form, qris_type: 'interactive' })}
+                                            className="sr-only"
+                                        />
+                                        <div className="text-center">
+                                            <div className="w-10 h-10 mx-auto mb-2 bg-purple-100 rounded-full flex items-center justify-center">
+                                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-800">Interactive QRIS</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">QRIS dari interactive.co.id</p>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
 
@@ -366,6 +393,25 @@ const Settings = () => {
                                     />
                                     <p className="text-xs text-gray-400 mt-1">
                                         URL endpoint QRIS dinamis dari DANA. Jumlah pembayaran akan digenerate otomatis berdasarkan total belanja.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Interactive QRIS URL */}
+                            {form.qris_type === 'interactive' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        URL API QRIS Interactive
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={form.qris_interactive_url}
+                                        onChange={(e) => setForm({ ...form, qris_interactive_url: e.target.value })}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                        placeholder="https://qris.interactive.co.id/api/your-endpoint..."
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        URL endpoint QRIS dinamis dari Interactive QRIS. Jumlah pembayaran akan digenerate otomatis berdasarkan total belanja.
                                     </p>
                                 </div>
                             )}

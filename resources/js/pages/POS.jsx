@@ -20,7 +20,7 @@ const POS = () => {
     const [savedCarts, setSavedCarts] = useState([]);
     const [showSavedCarts, setShowSavedCarts] = useState(false);
     const [showQRIS, setShowQRIS] = useState(false);
-    const [qrisConfig, setQrisConfig] = useState({ type: 'upload', image: null, danaUrl: '' });
+    const [qrisConfig, setQrisConfig] = useState({ type: 'upload', image: null, danaUrl: '', interactiveUrl: '' });
     const barcodeRef = useRef(null);
     const paidAmountRef = useRef(null);
 
@@ -80,6 +80,7 @@ const POS = () => {
                 type: data.qris_type || 'upload',
                 image: data.qris_image ? `data:image/webp;base64,${data.qris_image}` : null,
                 danaUrl: data.qris_dana_url || '',
+                interactiveUrl: data.qris_interactive_url || '',
             });
         } catch (e) {
             console.error('Failed to fetch QRIS settings:', e);
@@ -560,7 +561,7 @@ const POS = () => {
                                 <p className="text-sm text-gray-500 mb-4">Scan QR code di bawah untuk membayar</p>
 
                                 <div className="flex justify-center mb-4">
-                                    {qrisConfig.type === 'dana' && qrisConfig.danaUrl ? (
+                                    {(qrisConfig.type === 'dana' && qrisConfig.danaUrl) ? (
                                         <div className="w-56 h-56 bg-white border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center">
                                             <img
                                                 src={`${qrisConfig.danaUrl}?amount=${grandTotal}`}
@@ -575,6 +576,26 @@ const POS = () => {
                                                             </svg>
                                                             <p class="text-sm text-gray-500">URL QRIS tidak valid</p>
                                                             <p class="text-xs text-gray-400 mt-1">Periksa pengaturan URL DANA</p>
+                                                        </div>
+                                                    `;
+                                                }}
+                                            />
+                                        </div>
+                                    ) : (qrisConfig.type === 'interactive' && qrisConfig.interactiveUrl) ? (
+                                        <div className="w-56 h-56 bg-white border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center">
+                                            <img
+                                                src={`${qrisConfig.interactiveUrl}?amount=${grandTotal}`}
+                                                alt="QRIS Interactive"
+                                                className="w-52 h-52 object-contain"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.parentElement.innerHTML = `
+                                                        <div class="text-center p-4">
+                                                            <svg class="w-16 h-16 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                            </svg>
+                                                            <p class="text-sm text-gray-500">URL QRIS tidak valid</p>
+                                                            <p class="text-xs text-gray-400 mt-1">Periksa pengaturan URL Interactive</p>
                                                         </div>
                                                     `;
                                                 }}

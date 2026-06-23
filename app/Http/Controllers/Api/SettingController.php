@@ -29,8 +29,9 @@ class SettingController extends Controller
             'store_phone' => 'required|string|max:50',
             'store_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:512',
             // QRIS settings
-            'qris_type' => 'nullable|string|in:dana,upload',
+            'qris_type' => 'nullable|string|in:dana,upload,interactive',
             'qris_dana_url' => 'nullable|string|max:500',
+            'qris_interactive_url' => 'nullable|string|max:500',
             'qris_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:512',
         ];
 
@@ -46,6 +47,9 @@ class SettingController extends Controller
         }
         if ($request->has('qris_dana_url')) {
             Setting::setValue('qris_dana_url', $request->qris_dana_url);
+        }
+        if ($request->has('qris_interactive_url')) {
+            Setting::setValue('qris_interactive_url', $request->qris_interactive_url);
         }
 
         // Handle QRIS image upload
