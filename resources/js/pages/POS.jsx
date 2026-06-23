@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { productAPI, customerAPI, saleAPI } from '../services/api';
+import { productAPI, customerAPI, saleAPI, settingAPI } from '../services/api';
 import Swal from 'sweetalert2';
 import { formatCurrency, formatNumber, formatRupiah, parseRupiah } from '../utils/format';
 import ProductImage from '../components/ProductImage';
@@ -19,12 +19,15 @@ const POS = () => {
     const [showMethodPicker, setShowMethodPicker] = useState(false);
     const [savedCarts, setSavedCarts] = useState([]);
     const [showSavedCarts, setShowSavedCarts] = useState(false);
+    const [showQRIS, setShowQRIS] = useState(false);
+    const [qrisConfig, setQrisConfig] = useState({ type: 'upload', image: null, danaUrl: '' });
     const barcodeRef = useRef(null);
     const paidAmountRef = useRef(null);
 
     useEffect(() => {
         fetchProducts();
         fetchCustomers();
+        fetchQrisSettings();
         setTimeout(() => barcodeRef.current?.focus(), 100);
     }, []);
 
@@ -33,6 +36,13 @@ const POS = () => {
             barcodeRef.current?.focus();
         }
     }, [cart, showMethodPicker, showSavedCarts]);
+
+    // Open QRIS modal when payment method is set to qris
+    useEffect(() => {
+        if (showMethodPicker && paymentMethod === 'qris') {
+            setShowQRIS(true);
+        }
+    }, [showMethodPicker, paymentMethod]);
 
     // Keyboard shortcut: F10 = payment, F2 = simpan cart
     useEffect(() => {
@@ -60,6 +70,20 @@ const POS = () => {
             const res = await productAPI.index({ per_page: 200 });
             setProducts(res.data.data || []);
         } catch (e) { console.error(e); }
+    };
+
+    const fetchQrisSettings = async () => {
+        try {
+            const res = await settingAPI.index();
+            const data = res.data;
+            setQrisConfig({
+                type: data.qris_type || 'upload',
+                image: data.qris_image ? `data:image/webp;base64,${data.qris_image}` : null,
+                danaUrl: data.qris_dana_url || '',
+            });
+        } catch (e) {
+            console.error('Failed to fetch QRIS settings:', e);
+        }
     };
 
     const fetchCustomers = async () => {
@@ -321,6 +345,9 @@ const POS = () => {
             const res = await saleAPI.store(payload);
             const saleData = res.data.sale;
 
+            // Close QRIS modal if open
+            setShowQRIS(false);
+
             const action = await Swal.fire({
                 icon: 'success',
                 title: 'Transaksi Berhasil!',
@@ -524,6 +551,92 @@ const POS = () => {
                     )}
                 </div>
 
+                {/* === QRIS MODAL === */}
+                {showQRIS && (
+                    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4" onClick={() => setShowQRIS(false)}>
+                        <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+                            <div className="p-6 text-center">
+                                <h3 className="font-semibold text-gray-900 text-lg mb-1">Scan QRIS</h3>
+                                <p className="text-sm text-gray-500 mb-4">Scan QR code di bawah untuk membayar</p>
+
+                                <div className="flex justify-center mb-4">
+                                    {qrisConfig.type === 'dana' && qrisConfig.danaUrl ? (
+                                        <div className="w-56 h-56 bg-white border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center">
+                                            <img
+                                                src={`${qrisConfig.danaUrl}?amount=${grandTotal}`}
+                                                alt="QRIS DANA"
+                                                className="w-52 h-52 object-contain"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.parentElement.innerHTML = `
+                                                        <div class="text-center p-4">
+                                                            <svg class="w-16 h-16 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                            </svg>
+                                                            <p class="text-sm text-gray-500">URL QRIS tidak valid</p>
+                                                            <p class="text-xs text-gray-400 mt-1">Periksa pengaturan URL DANA</p>
+                                                        </div>
+                                                    `;
+                                                }}
+                                            />
+                                        </div>
+                                    ) : qrisConfig.image ? (
+                                        <div className="w-56 h-56 bg-white border-2 border-gray-200 rounded-xl flex items-center justify-center p-2">
+                                            <img
+                                                src={qrisConfig.image}
+                                                alt="QRIS"
+                                                className="w-full h-full object-contain"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="w-56 h-56 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center">
+                                            <div className="text-center">
+                                                <svg className="w-16 h-16 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                </svg>
+                                                <p className="text-sm text-gray-400">Belum ada QRIS</p>
+                                                <p className="text-xs text-gray-300 mt-1">Atur di menu Pengaturan</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Total amount badge */}
+                                <div className="bg-orange-50 rounded-lg p-3 mb-4">
+                                    <p className="text-xs text-orange-600">Total Pembayaran</p>
+                                    <p className="text-xl font-bold text-orange-700">{formatCurrency(grandTotal)}</p>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setShowQRIS(false);
+                                            setShowMethodPicker(true);
+                                            setTimeout(() => paidAmountRef.current?.focus(), 50);
+                                        }}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition-colors"
+                                    >
+                                        Kembali
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            // Set paid amount = grand total and process payment directly
+                                            setPaidAmount(grandTotal);
+                                            setPaidAmountDisplay(formatRupiah(grandTotal));
+                                            // Small delay then process
+                                            setTimeout(() => processPayment(), 100);
+                                        }}
+                                        disabled={loading}
+                                        className="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg text-sm transition-colors disabled:opacity-50"
+                                    >
+                                        {loading ? 'Memproses...' : 'Konfirmasi Bayar'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* === MODAL SAVED CARTS === */}
                 {showSavedCarts && (
                     <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4" onClick={() => setShowSavedCarts(false)}>
@@ -660,6 +773,7 @@ const POS = () => {
                             <label className="block text-xs text-gray-600 mb-1">Metode Pembayaran</label>
                             <div className="grid grid-cols-3 gap-2">
                                 {['cash', 'transfer', 'qris'].map(method => (
+                                    method === 'qris' && !qrisConfig.image && qrisConfig.type === 'upload' ? null :
                                     <button
                                         key={method}
                                         onClick={() => setPaymentMethod(method)}
