@@ -43,11 +43,15 @@ const BarcodeScanner = ({ onScan, onClose }) => {
                 await html5QrCode.start(
                     { facingMode: "environment" },
                     config,
-                    (decodedText) => {
+                    async (decodedText) => {
                         if (mounted) {
-                            onScan(decodedText.trim());
+                            try {
+                                await onScan(decodedText.trim());
+                            } catch (e) {
+                                console.error('Scan handler error:', e);
+                            }
                             setScanning(false);
-                            stopScanner();
+                            await stopScanner();
                             if (onClose) onClose();
                         }
                     },

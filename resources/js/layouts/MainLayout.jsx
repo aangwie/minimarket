@@ -14,14 +14,26 @@ const navItems = [
     { path: '/stock', label: 'Stok', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4' },
     { path: '/stock-movements', label: 'Riwayat Stok', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
     { path: '/reports/sales', label: 'Laporan Penjualan', icon: 'M9 17v-2m3 2v-4m3 4v-2m2 4H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    { path: '/product-analysis', label: 'Analisa Produk', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     { path: '/settings', label: 'Pengaturan', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
 ];
+
+const SIDEBAR_COLLAPSED_WIDTH = 'w-16';
+const SIDEBAR_EXPANDED_WIDTH = 'w-64';
 
 const MainLayout = ({ children }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+        const saved = localStorage.getItem('sidebarCollapsed');
+        return saved ? JSON.parse(saved) : false;
+    });
     const [storeLogo, setStoreLogo] = useState(null);
+
+    useEffect(() => {
+        localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarCollapsed));
+    }, [sidebarCollapsed]);
 
     useEffect(() => {
         fetchSettings();
@@ -44,57 +56,111 @@ const MainLayout = ({ children }) => {
         navigate('/login');
     };
 
+    const toggleSidebarCollapse = () => {
+        setSidebarCollapsed(!sidebarCollapsed);
+    };
+
+    const isCollapsed = sidebarCollapsed;
+
     return (
-        <div className="min-h-screen bg-gray-50 flex">
+        <div className="h-screen bg-gray-50 flex overflow-hidden">
             {/* Mobile overlay */}
             {sidebarOpen && (
                 <div className="fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
             )}
 
             {/* Sidebar */}
-            <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-                <div className="h-full flex flex-col">
-                    {/* Logo */}
-                    <div className="h-16 flex items-center gap-2 px-6 border-b border-gray-100">
-                        {storeLogo ? (
-                            <img
-                                src={storeLogo}
-                                alt="Logo"
-                                className="w-8 h-8 object-contain"
-                            />
+            <aside className={`
+                fixed lg:static inset-y-0 left-0 z-30 bg-white border-r border-gray-200
+                flex flex-col
+                transition-all duration-300 ease-in-out
+                ${isCollapsed ? 'w-16' : 'w-64'}
+                ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+            `}>
+                {/* Logo section */}
+                <div className={`
+                    h-16 flex items-center border-b border-gray-100 flex-shrink-0
+                    ${isCollapsed ? 'justify-center px-0' : 'px-6'}
+                `}>
+                    {isCollapsed ? (
+                        storeLogo ? (
+                            <img src={storeLogo} alt="Logo" className="w-8 h-8 object-contain" />
                         ) : (
                             <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
                                 <span className="text-white font-bold text-sm">M</span>
                             </div>
-                        )}
-                        <span className="font-bold text-lg text-orange-600">Minimarket</span>
-                    </div>
+                        )
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            {storeLogo ? (
+                                <img src={storeLogo} alt="Logo" className="w-8 h-8 object-contain" />
+                            ) : (
+                                <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <span className="text-white font-bold text-sm">M</span>
+                                </div>
+                            )}
+                            <span className="font-bold text-lg text-orange-600">Minimarket</span>
+                        </div>
+                    )}
+                </div>
 
-                    {/* Navigation */}
-                    <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-                        {navItems.map((item) => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                onClick={() => setSidebarOpen(false)}
-                                className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                                        isActive
-                                            ? 'bg-orange-50 text-orange-600'
-                                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                    }`
-                                }
-                            >
-                                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
+                {/* Toggle collapse button (desktop only) */}
+                <button
+                    onClick={toggleSidebarCollapse}
+                    className="hidden lg:flex items-center justify-center w-full h-8 border-b border-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+                    title={isCollapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+                >
+                    <svg
+                        className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    </svg>
+                </button>
+
+                {/* Navigation */}
+                <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto overflow-x-hidden">
+                    {navItems.map((item) => (
+                        <NavLink
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => setSidebarOpen(false)}
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                                    isActive
+                                        ? 'bg-orange-50 text-orange-600'
+                                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                } ${isCollapsed ? 'justify-center px-2' : ''}`
+                            }
+                            title={isCollapsed ? item.label : undefined}
+                        >
+                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
+                            </svg>
+                            {!isCollapsed && <span className="truncate">{item.label}</span>}
+                        </NavLink>
+                    ))}
+                </nav>
+
+                {/* User info */}
+                <div className={`
+                    border-t border-gray-100 flex-shrink-0
+                    ${isCollapsed ? 'p-2' : 'p-4'}
+                `}>
+                    {isCollapsed ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                            </div>
+                            <button onClick={handleLogout} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Logout">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                 </svg>
-                                {item.label}
-                            </NavLink>
-                        ))}
-                    </nav>
-
-                    {/* User info */}
-                    <div className="p-4 border-t border-gray-100">
+                            </button>
+                        </div>
+                    ) : (
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                                 {user?.name?.charAt(0)?.toUpperCase() || 'U'}
@@ -109,19 +175,36 @@ const MainLayout = ({ children }) => {
                                 </svg>
                             </button>
                         </div>
-                    </div>
+                    )}
                 </div>
             </aside>
 
             {/* Main content */}
             <div className="flex-1 min-w-0 flex flex-col">
-                {/* Top bar */}
-                <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6">
-                    <button className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg" onClick={() => setSidebarOpen(true)}>
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                {/* Top bar - fixed */}
+                <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 flex-shrink-0 z-10">
+                    <div className="flex items-center gap-2">
+                        <button className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg" onClick={() => setSidebarOpen(true)}>
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                        {/* Collapse toggle for mobile */}
+                        <button
+                            onClick={toggleSidebarCollapse}
+                            className="hidden sm:flex lg:hidden p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title={isCollapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+                        >
+                            <svg
+                                className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                            </svg>
+                        </button>
+                    </div>
                     <div className="flex items-center gap-3">
                         {storeLogo && (
                             <img
@@ -139,7 +222,7 @@ const MainLayout = ({ children }) => {
                     </div>
                 </header>
 
-                {/* Page content */}
+                {/* Page content - scrollable */}
                 <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
                     {children}
                 </main>

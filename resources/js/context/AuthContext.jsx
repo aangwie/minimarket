@@ -35,6 +35,13 @@ export const AuthProvider = ({ children }) => {
         } else {
             setLoading(false);
         }
+
+        // Listen for unauthorized events from API interceptor
+        const handleUnauthorized = () => {
+            setUser(null);
+        };
+        window.addEventListener('auth:unauthorized', handleUnauthorized);
+        return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
     }, []);
 
     const login = async (email, password) => {

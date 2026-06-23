@@ -15,6 +15,7 @@ import Sales from './pages/Sales';
 import Stock from './pages/Stock';
 import StockMovements from './pages/StockMovements';
 import SalesReport from './pages/SalesReport';
+import ProductAnalysis from './pages/ProductAnalysis';
 import Settings from './pages/Settings';
 import '../css/app.css';
 
@@ -58,6 +59,7 @@ function App() {
                     <Route path="/stock" element={<ProtectedRoute><Stock /></ProtectedRoute>} />
                     <Route path="/stock-movements" element={<ProtectedRoute><StockMovements /></ProtectedRoute>} />
                     <Route path="/reports/sales" element={<ProtectedRoute><SalesReport /></ProtectedRoute>} />
+                    <Route path="/product-analysis" element={<ProtectedRoute><ProductAnalysis /></ProtectedRoute>} />
                     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

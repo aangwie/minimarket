@@ -31,7 +31,8 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            // Dispatch custom event instead of window.location.href to avoid infinite loop with SPA
+            window.dispatchEvent(new CustomEvent('auth:unauthorized'));
         }
         return Promise.reject(error);
     }
@@ -105,6 +106,19 @@ export const settingAPI = {
         headers: { 'Content-Type': 'multipart/form-data' },
         params: { _method: 'PUT' },
     }),
+};
+
+export const reportAPI = {
+    sales: (params) => api.get('/reports/sales', { params }),
+    salesPdf: (params) => api.get('/reports/sales/pdf', { params, responseType: 'blob' }),
+    salesRecap: (params) => api.get('/reports/sales/recap', { params }),
+    productSales: (params) => api.get('/reports/sales/product-sales', { params }),
+};
+
+export const productAnalysisAPI = {
+    frequentlyBought: (productId) => api.get(`/products/frequently-bought/${productId}`),
+    products: (params) => api.get('/product-analysis/products', { params }),
+    topCategories: () => api.get('/product-analysis/top-categories'),
 };
 
 export const stockAPI = {

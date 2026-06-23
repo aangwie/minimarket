@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { productAPI, customerAPI, saleAPI } from '../services/api';
 import Swal from 'sweetalert2';
-import { formatCurrency, formatNumber } from '../utils/format';
-import BarcodeScanner from '../components/BarcodeScanner';
+import { formatCurrency, formatNumber, formatRupiah, parseRupiah } from '../utils/format';
 import ProductImage from '../components/ProductImage';
 
 const POS = () => {
@@ -15,14 +14,46 @@ const POS = () => {
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [discount, setDiscount] = useState(0);
     const [paidAmount, setPaidAmount] = useState(0);
+    const [paidAmountDisplay, setPaidAmountDisplay] = useState('');
     const [loading, setLoading] = useState(false);
-    const [showScanner, setShowScanner] = useState(false);
-    const searchRef = useRef(null);
+    const [showMethodPicker, setShowMethodPicker] = useState(false);
+    const [savedCarts, setSavedCarts] = useState([]);
+    const [showSavedCarts, setShowSavedCarts] = useState(false);
+    const barcodeRef = useRef(null);
+    const paidAmountRef = useRef(null);
 
     useEffect(() => {
         fetchProducts();
         fetchCustomers();
+        setTimeout(() => barcodeRef.current?.focus(), 100);
     }, []);
+
+    useEffect(() => {
+        if (!showMethodPicker && !showSavedCarts) {
+            barcodeRef.current?.focus();
+        }
+    }, [cart, showMethodPicker, showSavedCarts]);
+
+    // Keyboard shortcut: F10 = payment, F2 = simpan cart
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'F10') {
+                e.preventDefault();
+                if (cart.length > 0) {
+                    setShowMethodPicker(true);
+                    setTimeout(() => paidAmountRef.current?.focus(), 50);
+                }
+            }
+            if (e.key === 'F2') {
+                e.preventDefault();
+                if (cart.length > 0) {
+                    handleSaveCart();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [cart.length, selectedCustomer, discount]);
 
     const fetchProducts = async () => {
         try {
@@ -79,17 +110,126 @@ const POS = () => {
         });
     };
 
-    const handleBarcodeSearch = async (e) => {
+    const handleBarcodeSubmit = async (e) => {
         e?.preventDefault();
         if (!barcode.trim()) return;
         try {
             const res = await productAPI.barcode(barcode);
             addToCart(res.data);
             setBarcode('');
+            barcodeRef.current?.focus();
         } catch (e) {
             Swal.fire({ icon: 'error', title: 'Tidak Ditemukan', text: `Produk dengan kode ${barcode} tidak ditemukan` });
+            setBarcode('');
+            barcodeRef.current?.focus();
         }
     };
+
+    // === KERANJANG SEMENTARA ===
+    const handleSaveCart = () => {
+        if (cart.length === 0) {
+            Swal.fire({ icon: 'warning', title: 'Keranjang Kosong', text: 'Tidak ada item untuk disimpan' });
+            return;
+        }
+
+        // Ambil nama pelanggan yang dipilih
+        const customer = customers.find(c => c.id === parseInt(selectedCustomer));
+
+        Swal.fire({
+            title: 'Simpan Keranjang',
+            input: 'text',
+            inputLabel: 'Nama pelanggan / keterangan',
+            inputValue: customer?.name || `Pelanggan ${savedCarts.length + 1}`,
+            showCancelButton: true,
+            confirmButtonText: 'Simpan',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#FF6B00',
+            preConfirm: (name) => {
+                if (!name) {
+                    Swal.showValidationMessage('Nama tidak boleh kosong');
+                }
+                return name;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const label = result.value || `Pelanggan ${savedCarts.length + 1}`;
+                const newSaved = [...savedCarts, {
+                    id: Date.now(),
+                    label,
+                    cart: [...cart],
+                    customer_id: selectedCustomer,
+                    discount,
+                }];
+                setSavedCarts(newSaved);
+                setCart([]);
+                setDiscount(0);
+                setPaidAmount(0);
+                setPaidAmountDisplay('');
+                setShowMethodPicker(false);
+                barcodeRef.current?.focus();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Keranjang Disimpan',
+                    text: `Keranjang "${label}" telah disimpan. Ada ${newSaved.length} keranjang tersimpan.`,
+                    timer: 1500,
+                    showConfirmButton: false,
+                });
+            }
+        });
+    };
+
+    const handleRestoreCart = (saved) => {
+        Swal.fire({
+            title: 'Restore Keranjang',
+            text: `Lanjutkan belanja "${saved.label}"? Keranjang saat ini akan diganti.`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, Restore',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#FF6B00',
+        }).then((result) => {
+            if (result.isConfirmed) {
+                setCart(saved.cart);
+                setSelectedCustomer(saved.customer_id);
+                setDiscount(saved.discount);
+                setPaidAmount(0);
+                setPaidAmountDisplay('');
+                setShowMethodPicker(false);
+                setShowSavedCarts(false);
+                // Hapus dari daftar tersimpan
+                setSavedCarts(prev => prev.filter(s => s.id !== saved.id));
+                barcodeRef.current?.focus();
+            }
+        });
+    };
+
+    const handleDeleteSavedCart = (id) => {
+        setSavedCarts(prev => prev.filter(s => s.id !== id));
+    };
+
+    const clearCurrentCart = () => {
+        if (cart.length === 0) return;
+        Swal.fire({
+            title: 'Hapus Keranjang?',
+            text: 'Semua item di keranjang saat ini akan dihapus.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, Hapus',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#EF4444',
+        }).then((result) => {
+            if (result.isConfirmed) {
+                setCart([]);
+                setDiscount(0);
+                setPaidAmount(0);
+                setPaidAmountDisplay('');
+                setShowMethodPicker(false);
+                barcodeRef.current?.focus();
+            }
+        });
+    };
+
+    // === END KERANJANG SEMENTARA ===
 
     const filteredProducts = products.filter(p =>
         (p.name?.toLowerCase().includes(search.toLowerCase()) || p.code?.toLowerCase().includes(search.toLowerCase())) &&
@@ -99,7 +239,6 @@ const POS = () => {
     const subtotal = cart.reduce((sum, item) => sum + (Number(item.subtotal) || 0), 0);
     const totalDiskon = Number(discount) || 0;
     const grandTotal = Math.max(0, subtotal - totalDiskon);
-    const change = Math.max(0, (Number(paidAmount) || 0) - grandTotal);
     const cartTotalQty = cart.reduce((s, i) => s + (i.quantity || 0), 0);
 
     const printReceipt = async (sale) => {
@@ -155,32 +294,18 @@ const POS = () => {
         } catch (e) { console.error(e); }
     };
 
-    const handleCheckout = async () => {
+    const processPayment = async () => {
         if (cart.length === 0) {
             Swal.fire({ icon: 'warning', title: 'Keranjang Kosong', text: 'Tambahkan produk terlebih dahulu' });
             return;
         }
 
-        const result = await Swal.fire({
-            title: 'Konfirmasi Pembayaran',
-            html: `
-                <div style="text-align: left; font-size: 14px;">
-                    <p>Subtotal: <b>${formatCurrency(subtotal)}</b></p>
-                    ${totalDiskon > 0 ? `<p>Diskon: <b>${formatCurrency(totalDiskon)}</b></p>` : ''}
-                    <p>Total: <b>${formatCurrency(grandTotal)}</b></p>
-                    <p>Metode: <b>${paymentMethod.toUpperCase()}</b></p>
-                    <p>Item: <b>${cartTotalQty} produk</b></p>
-                </div>
-            `,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#FF6B00',
-            cancelButtonColor: '#6B7280',
-            confirmButtonText: 'Ya, Bayar',
-            cancelButtonText: 'Batal',
-        });
-
-        if (!result.isConfirmed) return;
+        const amount = parseRupiah(paidAmountDisplay) || grandTotal;
+        if (amount < grandTotal) {
+            Swal.fire({ icon: 'warning', title: 'Pembayaran Kurang', text: `Jumlah dibayar kurang dari total Rp ${formatRupiah(grandTotal)}` });
+            paidAmountRef.current?.focus();
+            return;
+        }
 
         setLoading(true);
         try {
@@ -189,14 +314,13 @@ const POS = () => {
                 items: cart.map(c => ({ product_id: c.product_id, quantity: c.quantity })),
                 discount: totalDiskon,
                 payment_method: paymentMethod,
-                payment_status: (Number(paidAmount) || 0) >= grandTotal ? 'paid' : 'unpaid',
-                paid_amount: Number(paidAmount) || grandTotal,
+                payment_status: 'paid',
+                paid_amount: amount,
             };
 
             const res = await saleAPI.store(payload);
             const saleData = res.data.sale;
 
-            // Show success with options
             const action = await Swal.fire({
                 icon: 'success',
                 title: 'Transaksi Berhasil!',
@@ -221,7 +345,29 @@ const POS = () => {
             setCart([]);
             setDiscount(0);
             setPaidAmount(0);
+            setPaidAmountDisplay('');
+            setShowMethodPicker(false);
             fetchProducts();
+
+            // Cek apakah ada keranjang tersimpan
+            if (savedCarts.length > 0) {
+                const nextCart = await Swal.fire({
+                    title: 'Ada Keranjang Tersimpan',
+                    text: `Terdapat ${savedCarts.length} keranjang yang belum dilanjutkan. Apakah ingin melihatnya?`,
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonText: 'Lihat',
+                    cancelButtonText: 'Nanti',
+                    confirmButtonColor: '#FF6B00',
+                });
+                if (nextCart.isConfirmed) {
+                    setShowSavedCarts(true);
+                } else {
+                    barcodeRef.current?.focus();
+                }
+            } else {
+                barcodeRef.current?.focus();
+            }
         } catch (error) {
             Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || 'Transaksi gagal' });
         } finally {
@@ -229,37 +375,67 @@ const POS = () => {
         }
     };
 
+    const handlePaidAmountChange = (e) => {
+        const raw = e.target.value;
+        const numeric = parseRupiah(raw);
+        setPaidAmount(numeric);
+        setPaidAmountDisplay(numeric > 0 ? formatRupiah(numeric) : '');
+    };
+
+    const handlePaidAmountKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            processPayment();
+        }
+    };
+
+    const handleCancelPayment = () => {
+        setShowMethodPicker(false);
+        setPaidAmount(0);
+        setPaidAmountDisplay('');
+        barcodeRef.current?.focus();
+    };
+
+    const displayAmount = parseRupiah(paidAmountDisplay);
+    const displayChange = Math.max(0, displayAmount - grandTotal);
+
     return (
         <div className="h-[calc(100vh-7rem)] flex flex-col lg:flex-row gap-4">
             {/* Left: Products */}
             <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-4 border-b border-gray-100">
-                    <div className="flex gap-2">
+                    <form onSubmit={handleBarcodeSubmit} className="flex gap-2 mb-3">
                         <div className="relative flex-1">
-                            <input
-                                ref={searchRef}
-                                type="text"
-                                placeholder="Cari nama produk..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                            />
                             <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                             </svg>
+                            <input
+                                ref={barcodeRef}
+                                type="text"
+                                placeholder="Scan / ketik kode barang..."
+                                value={barcode}
+                                onChange={(e) => setBarcode(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                            />
                         </div>
                         <button
-                            type="button"
-                            onClick={() => setShowScanner(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-                            title="Scan Barcode / QR Code"
+                            type="submit"
+                            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span className="hidden sm:inline">Scan</span>
+                            Cari
                         </button>
+                    </form>
+                    <div className="relative">
+                        <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Cari nama produk..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                        />
                     </div>
                 </div>
 
@@ -268,7 +444,7 @@ const POS = () => {
                         {filteredProducts.map(product => (
                             <button
                                 key={product.id}
-                                onClick={() => addToCart(product)}
+                                onClick={() => { addToCart(product); barcodeRef.current?.focus(); }}
                                 disabled={!product.is_active || product.stock <= 0}
                                 className={`text-left p-3 rounded-xl border transition-all ${
                                     !product.is_active || product.stock <= 0
@@ -296,13 +472,131 @@ const POS = () => {
             {/* Right: Cart */}
             <div className="w-full lg:w-96 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
                 <div className="p-4 border-b border-gray-100">
-                    <h3 className="font-semibold text-gray-900">Keranjang Belanja</h3>
-                    <div className="mt-2">
-                        <select value={selectedCustomer} onChange={(e) => setSelectedCustomer(e.target.value)} className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900">Keranjang Belanja</h3>
+                        <div className="flex items-center gap-2">
+                            {/* Tombol Lihat Keranjang Tersimpan */}
+                            {savedCarts.length > 0 && (
+                                <button
+                                    onClick={() => setShowSavedCarts(true)}
+                                    className="relative p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                    title={`${savedCarts.length} keranjang tersimpan`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                    </svg>
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                                        {savedCarts.length}
+                                    </span>
+                                </button>
+                            )}
+                            {/* Tombol Simpan Keranjang */}
+                            {cart.length > 0 && (
+                                <button
+                                    onClick={handleSaveCart}
+                                    className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                    title="Simpan keranjang (F2)"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                        <select
+                            value={selectedCustomer}
+                            onChange={(e) => setSelectedCustomer(e.target.value)}
+                            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                        >
                             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                     </div>
+                    {cart.length > 0 && (
+                        <div className="mt-2 text-xs text-gray-400 flex items-center gap-2">
+                            <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[10px] font-mono">F10</kbd>
+                            <span>Bayar</span>
+                            <span className="text-gray-300">|</span>
+                            <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[10px] font-mono">F2</kbd>
+                            <span>Simpan</span>
+                        </div>
+                    )}
                 </div>
+
+                {/* === MODAL SAVED CARTS === */}
+                {showSavedCarts && (
+                    <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4" onClick={() => setShowSavedCarts(false)}>
+                        <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                                <h3 className="font-semibold text-gray-900">
+                                    Keranjang Tersimpan ({savedCarts.length})
+                                </h3>
+                                <button onClick={() => setShowSavedCarts(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                            </div>
+                            <div className="p-4 overflow-y-auto max-h-[60vh] space-y-3">
+                                {savedCarts.length === 0 ? (
+                                    <p className="text-center text-gray-400 text-sm py-8">Belum ada keranjang tersimpan</p>
+                                ) : (
+                                    savedCarts.map((saved) => {
+                                        const totalItems = saved.cart.reduce((s, i) => s + i.quantity, 0);
+                                        const totalPrice = saved.cart.reduce((s, i) => s + i.subtotal, 0);
+                                        return (
+                                            <div key={saved.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1 min-w-0 mr-2">
+                                                        <p className="text-sm font-medium text-gray-900 truncate">{saved.label}</p>
+                                                        <p className="text-xs text-gray-500">{totalItems} item • {formatCurrency(totalPrice)}</p>
+                                                        {saved.discount > 0 && (
+                                                            <p className="text-xs text-red-500">Diskon: {formatCurrency(saved.discount)}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                                        <button
+                                                            onClick={() => handleRestoreCart(saved)}
+                                                            className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded-lg transition-colors"
+                                                        >
+                                                            Lanjutkan
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteSavedCart(saved.id)}
+                                                            className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                                                            title="Hapus"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                {/* Preview item */}
+                                                <div className="mt-2 space-y-1">
+                                                    {saved.cart.slice(0, 3).map(item => (
+                                                        <div key={item.product_id} className="flex justify-between text-xs text-gray-500">
+                                                            <span className="truncate mr-2">{item.name} x{item.quantity}</span>
+                                                            <span className="flex-shrink-0">{formatCurrency(item.subtotal)}</span>
+                                                        </div>
+                                                    ))}
+                                                    {saved.cart.length > 3 && (
+                                                        <p className="text-xs text-gray-400">...dan {saved.cart.length - 3} item lainnya</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-gray-100">
+                                <button
+                                    onClick={() => setShowSavedCarts(false)}
+                                    className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition-colors"
+                                >
+                                    Tutup
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                     {cart.length === 0 ? (
@@ -315,17 +609,20 @@ const POS = () => {
                                     <p className="text-xs text-gray-500">{formatCurrency(item.price)}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => removeFromCart(item.product_id)} className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded flex items-center justify-center text-sm font-medium">-</button>
+                                    <button onClick={() => { removeFromCart(item.product_id); barcodeRef.current?.focus(); }} className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded flex items-center justify-center text-sm font-medium">-</button>
                                     <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
                                     <button
-                                        onClick={() => addToCart({
-                                            id: item.product_id,
-                                            name: item.name,
-                                            code: item.code,
-                                            price: item.price,
-                                            stock: item.stock,
-                                            is_active: true,
-                                        })}
+                                        onClick={() => {
+                                            addToCart({
+                                                id: item.product_id,
+                                                name: item.name,
+                                                code: item.code,
+                                                price: item.price,
+                                                stock: item.stock,
+                                                is_active: true,
+                                            });
+                                            barcodeRef.current?.focus();
+                                        }}
                                         disabled={item.quantity >= item.stock}
                                         className="w-6 h-6 bg-orange-500 hover:bg-orange-600 text-white rounded flex items-center justify-center text-sm font-medium disabled:opacity-50"
                                     >+</button>
@@ -335,80 +632,153 @@ const POS = () => {
                     )}
                 </div>
 
-                <div className="p-4 border-t border-gray-100 space-y-3">
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Subtotal</span>
-                            <span className="font-semibold">{formatCurrency(subtotal)}</span>
+                {showMethodPicker ? (
+                    /* Payment mode */
+                    <div className="p-4 border-t border-gray-100 space-y-3">
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Subtotal</span>
+                                <span className="font-semibold">{formatCurrency(subtotal)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Diskon</span>
+                                <input
+                                    type="number"
+                                    value={discount}
+                                    onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                                    className="w-32 text-right px-2 py-1 text-sm border border-gray-300 rounded-lg"
+                                    min="0"
+                                />
+                            </div>
+                            <div className="flex justify-between text-sm font-bold text-lg border-t border-gray-200 pt-2">
+                                <span>Total</span>
+                                <span className="text-orange-600">{formatCurrency(grandTotal)}</span>
+                            </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Diskon</span>
+
+                        <div>
+                            <label className="block text-xs text-gray-600 mb-1">Metode Pembayaran</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {['cash', 'transfer', 'qris'].map(method => (
+                                    <button
+                                        key={method}
+                                        onClick={() => setPaymentMethod(method)}
+                                        className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
+                                            paymentMethod === method
+                                                ? 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-200'
+                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {method === 'cash' ? '💰 Tunai' : method === 'transfer' ? '🏦 Transfer' : '📱 QRIS'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-600 mb-1">
+                                Dibayar <span className="text-gray-400">(Enter untuk proses)</span>
+                            </label>
                             <input
-                                type="number"
-                                value={discount}
-                                onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                                className="w-32 text-right px-2 py-1 text-sm border border-gray-300 rounded-lg"
-                                min="0"
+                                ref={paidAmountRef}
+                                type="text"
+                                inputMode="numeric"
+                                value={paidAmountDisplay}
+                                onChange={handlePaidAmountChange}
+                                onKeyDown={handlePaidAmountKeyDown}
+                                className="w-full px-3 py-2.5 border-2 border-orange-500 rounded-lg focus:ring-2 focus:ring-orange-500 text-lg font-bold text-right"
+                                placeholder="0"
+                                autoFocus
                             />
+                            {displayAmount > 0 && (
+                                <div className="flex items-center justify-between mt-2">
+                                    <p className={`text-sm font-semibold ${displayChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {displayChange >= 0 ? `Kembali: ${formatRupiah(displayChange)}` : `Kurang: ${formatRupiah(Math.abs(displayChange))}`}
+                                    </p>
+                                    {displayChange >= 0 && (
+                                        <button
+                                            onClick={processPayment}
+                                            disabled={loading}
+                                            className="px-4 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            {loading ? 'Memproses...' : `Bayar ${formatRupiah(grandTotal)}`}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <div className="flex justify-between text-sm font-bold text-lg border-t border-gray-200 pt-2">
-                            <span>Total</span>
-                            <span className="text-orange-600">{formatCurrency(grandTotal)}</span>
-                        </div>
-                    </div>
 
-                    <div className="flex gap-2">
-                        {['cash', 'transfer', 'qris'].map(method => (
+                        <div className="flex gap-2">
                             <button
-                                key={method}
-                                onClick={() => setPaymentMethod(method)}
-                                className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                                    paymentMethod === method ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                }`}
+                                onClick={handleCancelPayment}
+                                className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition-colors"
                             >
-                                {method === 'cash' ? 'Tunai' : method === 'transfer' ? 'Transfer' : 'QRIS'}
+                                Batal
                             </button>
-                        ))}
+                            <button
+                                onClick={processPayment}
+                                disabled={loading || displayAmount < grandTotal}
+                                className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg text-sm transition-colors disabled:opacity-50"
+                            >
+                                {loading ? 'Memproses...' : `Bayar ${formatRupiah(grandTotal)}`}
+                            </button>
+                        </div>
                     </div>
+                ) : (
+                    /* Normal mode - summary only */
+                    <div className="p-4 border-t border-gray-100 space-y-3">
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Subtotal</span>
+                                <span className="font-semibold">{formatCurrency(subtotal)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Diskon</span>
+                                <input
+                                    type="number"
+                                    value={discount}
+                                    onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                                    className="w-32 text-right px-2 py-1 text-sm border border-gray-300 rounded-lg"
+                                    min="0"
+                                />
+                            </div>
+                            <div className="flex justify-between text-sm font-bold text-lg border-t border-gray-200 pt-2">
+                                <span>Total</span>
+                                <span className="text-orange-600">{formatCurrency(grandTotal)}</span>
+                            </div>
+                        </div>
 
-                    <div>
-                        <label className="block text-xs text-gray-600 mb-1">Dibayar</label>
-                        <input
-                            type="number"
-                            value={paidAmount}
-                            onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
-                            min="0"
-                        />
-                        {paidAmount > 0 && (
-                            <p className="text-xs text-green-600 mt-1">Kembali: {formatCurrency(change)}</p>
-                        )}
+                        <div className="flex gap-2">
+                            {cart.length > 0 && (
+                                <button
+                                    onClick={clearCurrentCart}
+                                    className="px-3 py-2 text-gray-500 hover:text-red-500 hover:bg-red-50 border border-gray-200 rounded-lg text-sm transition-colors"
+                                    title="Hapus keranjang"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    if (cart.length > 0) {
+                                        setShowMethodPicker(true);
+                                        setTimeout(() => paidAmountRef.current?.focus(), 50);
+                                    }
+                                }}
+                                disabled={cart.length === 0}
+                                className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                Bayar (F10)
+                            </button>
+                        </div>
                     </div>
-
-                    <button
-                        onClick={handleCheckout}
-                        disabled={cart.length === 0 || loading}
-                        className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
-                    >
-                        {loading ? 'Memproses...' : `Bayar ${formatCurrency(grandTotal)}`}
-                    </button>
-                </div>
+                )}
             </div>
-
-            {/* Barcode Scanner Modal */}
-            {showScanner && (
-                <BarcodeScanner
-                    onScan={async (code) => {
-                        try {
-                            const res = await productAPI.barcode(code);
-                            addToCart(res.data);
-                        } catch (e) {
-                            Swal.fire({ icon: 'error', title: 'Tidak Ditemukan', text: `Produk dengan kode ${code} tidak ditemukan` });
-                        }
-                    }}
-                    onClose={() => setShowScanner(false)}
-                />
-            )}
         </div>
     );
 };

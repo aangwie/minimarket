@@ -47,3 +47,17 @@ export const formatNumber = (value) => {
     if (value === null || value === undefined) return '0';
     return Number(value).toLocaleString('id-ID');
 };
+
+// Format angka ke format rupiah tanpa Rp (contoh: 20000 -> "20.000")
+export const formatRupiah = (value) => {
+    if (value === null || value === undefined || isNaN(value)) return '0';
+    return Math.floor(Number(value)).toLocaleString('id-ID');
+};
+
+// Parse string format rupiah ke number (contoh: "20.000" -> 20000)
+export const parseRupiah = (value) => {
+    if (!value) return 0;
+    // Hapus semua karakter non-digit
+    const clean = String(value).replace(/[^0-9]/g, '');
+    return parseInt(clean, 10) || 0;
+};
